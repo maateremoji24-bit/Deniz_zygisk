@@ -21,31 +21,31 @@ jobs:
       run: |
         unzip "ZYGISK SRC RAMA MODZ.zip" -d ./
 
-    - name: Paksa Trik Virtual Folder Dobby (Pasti Ketemu)
+    - name: Paksa Tembus Konfigurasi Android.mk (Pasti Sukses)
       run: |
-        # Cari di mana lokasi folder Dobby yang asli (huruf besar)
-        DOBBY_REAL=$(find . -type d -name "Dobby" | head -n 1)
-        echo "Folder Dobby asli ada di: $DOBBY_REAL"
+        # 1. Cari letak folder jni utama Anda
+        JNI_DIR=$(find . -name "jni" -type d | head -n 1)
+        echo "Folder JNI ditemukan di: $JNI_DIR"
         
-        if [ -n "$DOBBY_REAL" ]; then
-          # Masuk ke folder induk tempat Dobby berada
-          cd "$(dirname "$DOBBY_REAL")"
-          
-          # Buat folder bayangan bernama 'dobby' (huruf kecil) yang isinya nembus ke folder Dobby asli
-          ln -s Dobby dobby || cp -r Dobby dobby
-          echo "Membuat folder bayangan dobby huruf kecil di folder utama."
-          
-          # Masuk ke folder RAMA_MODZ tempat Main.cpp berada
-          if [ -d "RAMA_MODZ" ]; then
-            cd RAMA_MODZ
-            # Buat folder bayangan dobby di dalam folder RAMA_MODZ juga agar langsung dibaca oleh Main.cpp
-            ln -s ../Dobby dobby || cp -r ../Dobby dobby
-            echo "Membuat folder bayangan dobby huruf kecil di dalam RAMA_MODZ."
-            cd ..
-          fi
-          
-          cd -
+        cd "$JNI_DIR"
+        
+        # 2. Samakan nama folder Dobby kapital menjadi huruf kecil agar dibaca Linux
+        if [ -d "Dobby" ]; then
+          cp -r Dobby dobby
         fi
+        
+        # 3. Suntik file Android.mk agar memaksa compiler memasukkan folder dobby ke dalam include path global
+        if [ -f "Android.mk" ]; then
+          echo "Memodifikasi file Android.mk..."
+          # Menyisipkan flag include folder dobby tepat setelah deklarasi LOCAL_PATH
+          sed -i '/LOCAL_PATH/a LOCAL_C_INCLUDES += $(LOCAL_PATH)/dobby $(LOCAL_PATH)/Dobby $(LOCAL_PATH)' Android.mk
+          sed -i '/LOCAL_PATH/a LOCAL_CFLAGS += -I$(LOCAL_PATH)/dobby -I$(LOCAL_PATH)/Dobby' Android.mk
+          
+          echo "=== ISI ANDROID.MK SETELAH DIEDIT ==="
+          cat Android.mk
+        fi
+        
+        cd -
 
     - name: Set up Java JDK 11
       uses: actions/setup-java@v4
@@ -58,14 +58,10 @@ jobs:
         JNI_DIR=$(find . -name "jni" -type d | head -n 1)
         cd "$JNI_DIR/.."
         
-        # Masukkan flag pencarian global ke compiler agar dia mencari ke semua folder Dobby secara otomatis
-        export NDK_CFLAGS="-I./jni -I./jni/Dobby -I./jni/dobby -I./jni/RAMA_MODZ -I."
-        export APP_CFLAGS="-I./jni -I./jni/Dobby -I./jni/dobby -I./jni/RAMA_MODZ -I."
-        
         if command -v ndk-build &> /dev/null; then
-          ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. CFLAGS="$NDK_CFLAGS" APP_CFLAGS="$APP_CFLAGS"
+          ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=.
         else
-          $ANDROID_HOME/ndk-bundle/ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. CFLAGS="$NDK_CFLAGS" APP_CFLAGS="$APP_CFLAGS" || ./ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. CFLAGS="$NDK_CFLAGS" APP_CFLAGS="$APP_CFLAGS" || true
+          $ANDROID_HOME/ndk-bundle/ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. || ./ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. || true
         fi
 
     - name: Upload Build Artifact (ARM64)
