@@ -15,25 +15,26 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y unzip android-sdk-platform-tools-common Google-android-ndk-installer || true
-        sudo apt-get install -y make clang git || true
+        sudo apt-get install -y make clang || true
 
     - name: Extract Zygisk Source ZIP
       run: |
         unzip "ZYGISK SRC RAMA MODZ.zip" -d ./
         ls -la
 
-    - name: Clone Dobby Dependency
+    - name: Fix Dobby Folder Case Sensitivity
       run: |
-        # Mencari di mana folder jni berada agar Dobby diletakkan di tempat yang benar
+        # Mencari folder JNI
         JNI_DIR=$(find . -name "jni" -type d | head -n 1)
         if [ -n "$JNI_DIR" ]; then
-          echo "Mengunduh Dobby framework ke dalam folder JNI..."
           cd "$JNI_DIR"
-          # Mengunduh source code Dobby langsung dari repositori resminya
-          git clone --depth 1 https://github.com dobby
-        else
-          echo "Folder jni tidak ditemukan, mencoba mengunduh Dobby di direktori root..."
-          git clone --depth 1 https://github.com dobby
+          # Jika ada folder 'Dobby' (huruf kapital), buat salinannya dengan nama 'dobby' (huruf kecil)
+          if [ -d "Dobby" ]; then
+            echo "Memperbaiki sensitivitas huruf folder Dobby..."
+            cp -r Dobby dobby
+          fi
+          ls -la
+          cd -
         fi
 
     - name: Set up Java JDK 11
