@@ -21,54 +21,24 @@ jobs:
       run: |
         unzip "ZYGISK SRC RAMA MODZ.zip" -d ./
 
-    - name: Paksa Tulis Ulang Konfigurasi Kompilasi (Reset Total Android.mk)
+    - name: Solusi Agresif Copy Dobby ke Semua Folder
       run: |
-        # Cari di mana lokasi folder jni utama Anda berada
-        JNI_DIR=$(find . -name "jni" -type d | head -n 1)
-        echo "Folder JNI ditemukan di: $JNI_DIR"
-        
-        cd "$JNI_DIR"
-        
-        # 1. Samakan folder Dobby kapital menjadi huruf kecil untuk Linux
-        if [ -d "Dobby" ]; then
-          cp -r Dobby dobby
+        # Cari file dobby.h asli di dalam zip Anda
+        ORIGINAL_DOBBY_H=$(find . -name "dobby.h" | head -n 1)
+        echo "File dobby.h asli ditemukan di: $ORIGINAL_DOBBY_H"
+
+        if [ -n "$ORIGINAL_DOBBY_H" ]; then
+          # Trik Utama: Cari semua folder di dalam proyek, lalu buat subfolder bernama 'dobby' dan paste file 'dobby.h' di dalamnya.
+          # Ini akan menjamin ke mana pun compiler mencari "dobby/dobby.h", jalurnya pasti ada secara fisik!
+          find . -type d | while read -r dir; do
+            mkdir -p "$dir/dobby"
+            cp "$ORIGINAL_DOBBY_H" "$dir/dobby/" 2>/dev/null || true
+            cp "$ORIGINAL_DOBBY_H" "$dir/" 2>/dev/null || true
+          done
+          echo "Selesai menyalin dobby.h secara merata ke seluruh struktur folder proyek!"
+        else
+          echo "Peringatan: dobby.h tidak ditemukan di dalam ZIP!"
         fi
-        
-        # 2. Hapus Android.mk lama yang bermasalah dan ganti dengan konfigurasi baru yang dipaksa lolos
-        rm -f Android.mk
-        
-        cat << 'EOF' > Android.mk
-        LOCAL_PATH := $(call my-dir)
-        
-        include $(CLEAR_VARS)
-        
-        LOCAL_MODULE    := RAMA_MODZ
-        
-        # Memaksa compiler mencari file header di folder jni, dobby, Dobby, dan RAMA_MODZ
-        LOCAL_C_INCLUDES := $(LOCAL_PATH) \
-                            $(LOCAL_PATH)/dobby \
-                            $(LOCAL_PATH)/Dobby \
-                            $(LOCAL_PATH)/RAMA_MODZ
-        
-        LOCAL_CFLAGS     := -DNDEBUG -O3 -I$(LOCAL_PATH)/dobby -I$(LOCAL_PATH)/Dobby
-        
-        # Mencari otomatis semua file .cpp dan .c di dalam folder jni dan subfoldernya
-        LOCAL_SRC_FILES  := $(wildcard *.cpp) \
-                            $(wildcard *.c) \
-                            $(wildcard RAMA_MODZ/*.cpp) \
-                            $(wildcard RAMA_MODZ/*.c) \
-                            $(wildcard RamaModz/*.cpp) \
-                            $(wildcard RamaModz/*.c)
-        
-        # Memasukkan library prebuilt Dobby yang sudah ada di folder Anda
-        LOCAL_LDFLAGS    := -llog -landroid
-        
-        include $(BUILD_SHARED_LIBRARY)
-        EOF
-        
-        echo "=== BERHASIL RESET DAN MEMBUAT ANDROID.MK BARU ==="
-        cat Android.mk
-        cd -
 
     - name: Set up Java JDK 11
       uses: actions/setup-java@v4
