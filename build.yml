@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # Menggunakan Ubuntu lama agar kompatibel dengan NDK jadul
 
     steps:
     - name: Checkout Source Code
@@ -14,30 +14,30 @@ jobs:
     - name: Install Unzip & Android NDK via APT
       run: |
         sudo apt-get update
-        sudo apt-get install -y unzip android-sdk-platform-tools-common Google-android-ndk-installer || true
-        sudo apt-get install -y make clang || true
+        sudo apt-get install -y unzip make clang git python3 || true
 
     - name: Extract Zygisk Source ZIP
       run: |
         unzip "ZYGISK SRC RAMA MODZ.zip" -d ./
 
-    - name: Solusi Agresif Copy Dobby ke Semua Folder
+    - name: Download and Setup Old NDK Legacy
       run: |
-        # Cari file dobby.h asli di dalam zip Anda
-        ORIGINAL_DOBBY_H=$(find . -name "dobby.h" | head -n 1)
-        echo "File dobby.h asli ditemukan di: $ORIGINAL_DOBBY_H"
+        # Mengunduh NDK versi lama secara manual agar fungsi kompilasi jadulnya aktif kembali
+        echo "Mengunduh paket NDK versi kompatibilitas lama..."
+        curl -L https://google.com -o ndk_legacy.zip
+        unzip -q ndk_legacy.zip
+        echo "NDK_LEGACY_HOME=$GITHUB_WORKSPACE/android-ndk-r10e" >> $GITHUB_ENV
 
+    - name: Paksa Trik Struktur Berkas Duplikat
+      run: |
+        # Menduplikasi berkas dobby di semua titik agar jalur lokal lama tetap terbaca
+        ORIGINAL_DOBBY_H=$(find . -name "dobby.h" | head -n 1)
         if [ -n "$ORIGINAL_DOBBY_H" ]; then
-          # Trik Utama: Cari semua folder di dalam proyek, lalu buat subfolder bernama 'dobby' dan paste file 'dobby.h' di dalamnya.
-          # Ini akan menjamin ke mana pun compiler mencari "dobby/dobby.h", jalurnya pasti ada secara fisik!
           find . -type d | while read -r dir; do
             mkdir -p "$dir/dobby"
             cp "$ORIGINAL_DOBBY_H" "$dir/dobby/" 2>/dev/null || true
             cp "$ORIGINAL_DOBBY_H" "$dir/" 2>/dev/null || true
           done
-          echo "Selesai menyalin dobby.h secara merata ke seluruh struktur folder proyek!"
-        else
-          echo "Peringatan: dobby.h tidak ditemukan di dalam ZIP!"
         fi
 
     - name: Set up Java JDK 11
@@ -46,16 +46,13 @@ jobs:
         java-version: '11'
         distribution: 'temurin'
 
-    - name: Build Zygisk Mod
+    - name: Build Zygisk Mod (Legacy Mode)
       run: |
         JNI_DIR=$(find . -name "jni" -type d | head -n 1)
         cd "$JNI_DIR/.."
         
-        if command -v ndk-build &> /dev/null; then
-          ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=.
-        else
-          $ANDROID_HOME/ndk-bundle/ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. || ./ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. || true
-        fi
+        # Menjalankan kompilasi menggunakan biner NDK versi jadul yang diunduh tadi
+        $NDK_LEGACY_HOME/ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=.
 
     - name: Upload Build Artifact (ARM64)
       uses: actions/upload-artifact@v4
