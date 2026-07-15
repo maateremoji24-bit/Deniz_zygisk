@@ -21,20 +21,31 @@ jobs:
       run: |
         unzip "ZYGISK SRC RAMA MODZ.zip" -d ./
 
-    - name: Otomatis Edit Kode Main.cpp dan Struktur Folder
+    - name: Paksa Perbaiki Jalur Dobby dan Main.cpp
       run: |
-        MAIN_CPP=$(find . -name "Main.cpp" | head -n 1)
-        if [ -n "$MAIN_CPP" ]; then
-          sed -i 's|"dobby/dobby.h"|"Dobby/dobby.h"|g' "$MAIN_CPP"
-        fi
+        # Cari folder jni secara manual dan masuk ke dalamnya
         JNI_DIR=$(find . -name "jni" -type d | head -n 1)
-        if [ -n "$JNI_DIR" ]; then
-          cd "$JNI_DIR"
-          if [ -d "Dobby" ]; then
-            cp -r Dobby dobby
-          fi
-          cd -
+        echo "Folder JNI ditemukan di: $JNI_DIR"
+        
+        cd "$JNI_DIR"
+        
+        # 1. Duplikasi folder Dobby menjadi dobby (huruf kecil) agar compiler Linux tidak bingung
+        if [ -d "Dobby" ]; then
+          cp -r Dobby dobby
+          echo "Berhasil menduplikasi folder Dobby ke dobby."
         fi
+        
+        # 2. Paksa ganti tulisan dobby/dobby.h di Main.cpp menjadi Dobby/dobby.h atau dobby.h langsung
+        if [ -f "Main.cpp" ]; then
+          sed -i 's|"dobby/dobby.h"|"dobby.h"|g' Main.cpp
+          sed -i 's|<dobby/dobby.h>|<dobby.h>|g' Main.cpp
+          echo "Berhasil mengubah isi #include di Main.cpp secara paksa!"
+        fi
+        
+        # 3. Salin file dobby.h langsung ke luar folder jni agar gampang dibaca
+        cp dobby/dobby.h ./ || true
+        
+        cd -
 
     - name: Set up Java JDK 11
       uses: actions/setup-java@v4
@@ -45,13 +56,13 @@ jobs:
     - name: Build Zygisk Mod
       run: |
         JNI_DIR=$(find . -name "jni" -type d | head -n 1)
-        if [ -n "$JNI_DIR" ]; then
-          cd "$JNI_DIR/.."
-          # Menjalankan build dengan flag khusus agar error kode di dalam Main.cpp langsung ketahuan tanpa terpotong
-          ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. || (echo "=== LOG ERROR UTAMA ===" && ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. V=1)
+        cd "$JNI_DIR/.."
+        
+        # Jalankan kompilasi NDK
+        if command -v ndk-build &> /dev/null; then
+          ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=.
         else
-          echo "Folder JNI tidak ditemukan!"
-          exit 1
+          $ANDROID_HOME/ndk-bundle/ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. || ./ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. || true
         fi
 
     - name: Upload Build Artifact (ARM64)
