@@ -21,31 +21,39 @@ jobs:
       run: |
         unzip "ZYGISK SRC RAMA MODZ.zip" -d ./
 
-    - name: Paksa Perbaiki Jalur Dobby dan Main.cpp
+    - name: Paksa Perbaiki Struktur Folder dan Edit Main.cpp
       run: |
-        # Cari folder jni secara manual dan masuk ke dalamnya
+        # 1. Cari file Main.cpp di subfolder mana pun
+        MAIN_CPP_PATH=$(find . -name "Main.cpp" | head -n 1)
+        echo "Main.cpp ditemukan di: $MAIN_CPP_PATH"
+        
+        if [ -n "$MAIN_CPP_PATH" ]; then
+          # Ubah isi include agar langsung mencari file dobby.h di folder yang sama
+          sed -i 's|"dobby/dobby.h"|"dobby.h"|g' "$MAIN_CPP_PATH"
+          sed -i 's|<dobby/dobby.h>|<dobby.h>|g' "$MAIN_CPP_PATH"
+          echo "Berhasil mengedit file Main.cpp!"
+          
+          # Dapatkan folder tempat Main.cpp berada (folder RAMA_MODZ)
+          TARGET_DIR=$(dirname "$MAIN_CPP_PATH")
+          
+          # Cari di mana folder Dobby asli berada untuk diambil file dobby.h nya
+          DOBBY_H_PATH=$(find . -name "dobby.h" | head -n 1)
+          if [ -n "$DOBBY_H_PATH" ]; then
+            echo "Menyalin berkas dobby.h dari $DOBBY_H_PATH ke $TARGET_DIR"
+            cp "$DOBBY_H_PATH" "$TARGET_DIR/"
+          fi
+        fi
+
+        # 2. Salin juga folder Dobby ke folder root kompilasi sebagai cadangan global
         JNI_DIR=$(find . -name "jni" -type d | head -n 1)
-        echo "Folder JNI ditemukan di: $JNI_DIR"
-        
-        cd "$JNI_DIR"
-        
-        # 1. Duplikasi folder Dobby menjadi dobby (huruf kecil) agar compiler Linux tidak bingung
-        if [ -d "Dobby" ]; then
-          cp -r Dobby dobby
-          echo "Berhasil menduplikasi folder Dobby ke dobby."
+        if [ -n "$JNI_DIR" ]; then
+          cd "$JNI_DIR"
+          if [ -d "Dobby" ]; then
+            cp -r Dobby dobby
+            cp Dobby/dobby.h ./ 2>/dev/null || true
+          fi
+          cd -
         fi
-        
-        # 2. Paksa ganti tulisan dobby/dobby.h di Main.cpp menjadi Dobby/dobby.h atau dobby.h langsung
-        if [ -f "Main.cpp" ]; then
-          sed -i 's|"dobby/dobby.h"|"dobby.h"|g' Main.cpp
-          sed -i 's|<dobby/dobby.h>|<dobby.h>|g' Main.cpp
-          echo "Berhasil mengubah isi #include di Main.cpp secara paksa!"
-        fi
-        
-        # 3. Salin file dobby.h langsung ke luar folder jni agar gampang dibaca
-        cp dobby/dobby.h ./ || true
-        
-        cd -
 
     - name: Set up Java JDK 11
       uses: actions/setup-java@v4
@@ -58,11 +66,14 @@ jobs:
         JNI_DIR=$(find . -name "jni" -type d | head -n 1)
         cd "$JNI_DIR/.."
         
-        # Jalankan kompilasi NDK
+        # Tambahkan flag include global ke folder Dobby agar aman dari segala sisi
+        export NDK_CFLAGS="-I./jni -I./jni/Dobby -I./jni/dobby -I./jni/RAMA_MODZ"
+        export APP_CFLAGS="-I./jni -I./jni/Dobby -I./jni/dobby -I./jni/RAMA_MODZ"
+        
         if command -v ndk-build &> /dev/null; then
-          ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=.
+          ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. CFLAGS="$NDK_CFLAGS" APP_CFLAGS="$APP_CFLAGS"
         else
-          $ANDROID_HOME/ndk-bundle/ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. || ./ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. || true
+          $ANDROID_HOME/ndk-bundle/ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. CFLAGS="$NDK_CFLAGS" APP_CFLAGS="$APP_CFLAGS" || ./ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. CFLAGS="$NDK_CFLAGS" APP_CFLAGS="$APP_CFLAGS" || true
         fi
 
     - name: Upload Build Artifact (ARM64)
