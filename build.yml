@@ -20,23 +20,13 @@ jobs:
     - name: Extract Zygisk Source ZIP
       run: |
         unzip "ZYGISK SRC RAMA MODZ.zip" -d ./
-        ls -la
 
     - name: Otomatis Edit Kode Main.cpp dan Struktur Folder
       run: |
-        # 1. Cari file Main.cpp di mana pun dia berada
         MAIN_CPP=$(find . -name "Main.cpp" | head -n 1)
-        
         if [ -n "$MAIN_CPP" ]; then
-          echo "File Main.cpp ditemukan di: $MAIN_CPP"
-          # Mengubah tulisan dobby/dobby.h menjadi Dobby/dobby.h secara otomatis
           sed -i 's|"dobby/dobby.h"|"Dobby/dobby.h"|g' "$MAIN_CPP"
-          echo "Berhasil mengubah baris #include di Main.cpp!"
-        else
-          echo "Peringatan: Main.cpp tidak ditemukan langsung lewat pencarian standar."
         fi
-
-        # 2. Duplikasi folder sebagai cadangan ekstra agar sistem tidak bingung membaca folder
         JNI_DIR=$(find . -name "jni" -type d | head -n 1)
         if [ -n "$JNI_DIR" ]; then
           cd "$JNI_DIR"
@@ -54,28 +44,13 @@ jobs:
 
     - name: Build Zygisk Mod
       run: |
-        GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
         JNI_DIR=$(find . -name "jni" -type d | head -n 1)
-
-        if [ -n "$GRADLEW_PATH" ]; then
-          echo "Mendeteksi proyek berbasis Gradle. Memulai build..."
-          cd $(dirname "$GRADLEW_PATH")
-          chmod +x gradlew
-          ./gradlew assembleRelease
-        elif [ -n "$JNI_DIR" ]; then
-          echo "Mendeteksi proyek berbasis JNI/ndk-build. Memulai build..."
+        if [ -n "$JNI_DIR" ]; then
           cd "$JNI_DIR/.."
-          if command -v ndk-build &> /dev/null; then
-            ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=.
-          elif [ -d "$ANDROID_HOME/ndk" ]; then
-            LATEST_NDK=$(ls -d $ANDROID_HOME/ndk/* | sort -V | tail -n 1)
-            $LATEST_NDK/ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=.
-          else
-            echo "Komponen ndk-build tidak dapat ditemukan di sistem!"
-            exit 1
-          fi
+          # Menjalankan build dengan flag khusus agar error kode di dalam Main.cpp langsung ketahuan tanpa terpotong
+          ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. || (echo "=== LOG ERROR UTAMA ===" && ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. V=1)
         else
-          echo "Berkas konfigurasi build (Gradle/JNI) tidak ditemukan!"
+          echo "Folder JNI tidak ditemukan!"
           exit 1
         fi
 
