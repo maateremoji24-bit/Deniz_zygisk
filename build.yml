@@ -15,13 +15,26 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y unzip android-sdk-platform-tools-common Google-android-ndk-installer || true
-        # Mengunduh paket kompilator ndk standar linux jika installer lokal tidak tersedia
-        sudo apt-get install -y make clang || true
+        sudo apt-get install -y make clang git || true
 
     - name: Extract Zygisk Source ZIP
       run: |
         unzip "ZYGISK SRC RAMA MODZ.zip" -d ./
         ls -la
+
+    - name: Clone Dobby Dependency
+      run: |
+        # Mencari di mana folder jni berada agar Dobby diletakkan di tempat yang benar
+        JNI_DIR=$(find . -name "jni" -type d | head -n 1)
+        if [ -n "$JNI_DIR" ]; then
+          echo "Mengunduh Dobby framework ke dalam folder JNI..."
+          cd "$JNI_DIR"
+          # Mengunduh source code Dobby langsung dari repositori resminya
+          git clone --depth 1 https://github.com dobby
+        else
+          echo "Folder jni tidak ditemukan, mencoba mengunduh Dobby di direktori root..."
+          git clone --depth 1 https://github.com dobby
+        fi
 
     - name: Set up Java JDK 11
       uses: actions/setup-java@v4
@@ -31,7 +44,6 @@ jobs:
 
     - name: Build Zygisk Mod
       run: |
-        # Mencari letak berkas utama kompilasi
         GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
         JNI_DIR=$(find . -name "jni" -type d | head -n 1)
 
@@ -43,11 +55,9 @@ jobs:
         elif [ -n "$JNI_DIR" ]; then
           echo "Mendeteksi proyek berbasis JNI/ndk-build. Memulai build..."
           cd "$JNI_DIR/.."
-          # Menggunakan kompilator ndk-build dari sistem utama linux
           if command -v ndk-build &> /dev/null; then
             ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=.
           elif [ -d "$ANDROID_HOME/ndk" ]; then
-            # Mencari versi ndk cadangan di dalam folder SDK alternatif
             LATEST_NDK=$(ls -d $ANDROID_HOME/ndk/* | sort -V | tail -n 1)
             $LATEST_NDK/ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=.
           else
