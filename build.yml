@@ -21,37 +21,29 @@ jobs:
       run: |
         unzip "ZYGISK SRC RAMA MODZ.zip" -d ./
 
-    - name: Paksa Perbaiki Struktur Folder dan Edit Main.cpp
+    - name: Paksa Trik Virtual Folder Dobby (Pasti Ketemu)
       run: |
-        # 1. Cari file Main.cpp di subfolder mana pun
-        MAIN_CPP_PATH=$(find . -name "Main.cpp" | head -n 1)
-        echo "Main.cpp ditemukan di: $MAIN_CPP_PATH"
+        # Cari di mana lokasi folder Dobby yang asli (huruf besar)
+        DOBBY_REAL=$(find . -type d -name "Dobby" | head -n 1)
+        echo "Folder Dobby asli ada di: $DOBBY_REAL"
         
-        if [ -n "$MAIN_CPP_PATH" ]; then
-          # Ubah isi include agar langsung mencari file dobby.h di folder yang sama
-          sed -i 's|"dobby/dobby.h"|"dobby.h"|g' "$MAIN_CPP_PATH"
-          sed -i 's|<dobby/dobby.h>|<dobby.h>|g' "$MAIN_CPP_PATH"
-          echo "Berhasil mengedit file Main.cpp!"
+        if [ -n "$DOBBY_REAL" ]; then
+          # Masuk ke folder induk tempat Dobby berada
+          cd "$(dirname "$DOBBY_REAL")"
           
-          # Dapatkan folder tempat Main.cpp berada (folder RAMA_MODZ)
-          TARGET_DIR=$(dirname "$MAIN_CPP_PATH")
+          # Buat folder bayangan bernama 'dobby' (huruf kecil) yang isinya nembus ke folder Dobby asli
+          ln -s Dobby dobby || cp -r Dobby dobby
+          echo "Membuat folder bayangan dobby huruf kecil di folder utama."
           
-          # Cari di mana folder Dobby asli berada untuk diambil file dobby.h nya
-          DOBBY_H_PATH=$(find . -name "dobby.h" | head -n 1)
-          if [ -n "$DOBBY_H_PATH" ]; then
-            echo "Menyalin berkas dobby.h dari $DOBBY_H_PATH ke $TARGET_DIR"
-            cp "$DOBBY_H_PATH" "$TARGET_DIR/"
+          # Masuk ke folder RAMA_MODZ tempat Main.cpp berada
+          if [ -d "RAMA_MODZ" ]; then
+            cd RAMA_MODZ
+            # Buat folder bayangan dobby di dalam folder RAMA_MODZ juga agar langsung dibaca oleh Main.cpp
+            ln -s ../Dobby dobby || cp -r ../Dobby dobby
+            echo "Membuat folder bayangan dobby huruf kecil di dalam RAMA_MODZ."
+            cd ..
           fi
-        fi
-
-        # 2. Salin juga folder Dobby ke folder root kompilasi sebagai cadangan global
-        JNI_DIR=$(find . -name "jni" -type d | head -n 1)
-        if [ -n "$JNI_DIR" ]; then
-          cd "$JNI_DIR"
-          if [ -d "Dobby" ]; then
-            cp -r Dobby dobby
-            cp Dobby/dobby.h ./ 2>/dev/null || true
-          fi
+          
           cd -
         fi
 
@@ -66,9 +58,9 @@ jobs:
         JNI_DIR=$(find . -name "jni" -type d | head -n 1)
         cd "$JNI_DIR/.."
         
-        # Tambahkan flag include global ke folder Dobby agar aman dari segala sisi
-        export NDK_CFLAGS="-I./jni -I./jni/Dobby -I./jni/dobby -I./jni/RAMA_MODZ"
-        export APP_CFLAGS="-I./jni -I./jni/Dobby -I./jni/dobby -I./jni/RAMA_MODZ"
+        # Masukkan flag pencarian global ke compiler agar dia mencari ke semua folder Dobby secara otomatis
+        export NDK_CFLAGS="-I./jni -I./jni/Dobby -I./jni/dobby -I./jni/RAMA_MODZ -I."
+        export APP_CFLAGS="-I./jni -I./jni/Dobby -I./jni/dobby -I./jni/RAMA_MODZ -I."
         
         if command -v ndk-build &> /dev/null; then
           ndk-build APP_ABI=arm64-v8a NDK_PROJECT_PATH=. CFLAGS="$NDK_CFLAGS" APP_CFLAGS="$APP_CFLAGS"
