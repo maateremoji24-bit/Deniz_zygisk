@@ -22,18 +22,27 @@ jobs:
         unzip "ZYGISK SRC RAMA MODZ.zip" -d ./
         ls -la
 
-    - name: Fix Dobby Folder Case Sensitivity
+    - name: Otomatis Edit Kode Main.cpp dan Struktur Folder
       run: |
-        # Mencari folder JNI
+        # 1. Cari file Main.cpp di mana pun dia berada
+        MAIN_CPP=$(find . -name "Main.cpp" | head -n 1)
+        
+        if [ -n "$MAIN_CPP" ]; then
+          echo "File Main.cpp ditemukan di: $MAIN_CPP"
+          # Mengubah tulisan dobby/dobby.h menjadi Dobby/dobby.h secara otomatis
+          sed -i 's|"dobby/dobby.h"|"Dobby/dobby.h"|g' "$MAIN_CPP"
+          echo "Berhasil mengubah baris #include di Main.cpp!"
+        else
+          echo "Peringatan: Main.cpp tidak ditemukan langsung lewat pencarian standar."
+        fi
+
+        # 2. Duplikasi folder sebagai cadangan ekstra agar sistem tidak bingung membaca folder
         JNI_DIR=$(find . -name "jni" -type d | head -n 1)
         if [ -n "$JNI_DIR" ]; then
           cd "$JNI_DIR"
-          # Jika ada folder 'Dobby' (huruf kapital), buat salinannya dengan nama 'dobby' (huruf kecil)
           if [ -d "Dobby" ]; then
-            echo "Memperbaiki sensitivitas huruf folder Dobby..."
             cp -r Dobby dobby
           fi
-          ls -la
           cd -
         fi
 
@@ -66,7 +75,7 @@ jobs:
             exit 1
           fi
         else
-          echo "Berkas konfigurasi build (Gradle/JNI) tidak ditemukan di dalam ZIP Anda!"
+          echo "Berkas konfigurasi build (Gradle/JNI) tidak ditemukan!"
           exit 1
         fi
 
